@@ -90,6 +90,9 @@ func TestFunc(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected to get error from retry.Func, but got nil")
 		}
+		if d := time.Since(begin).Round(cfg.Delay); d != 10*time.Millisecond {
+			t.Fatalf("total time took %v, instead of 10ms", d)
+		}
 		want := [3]time.Duration{0, 5 * time.Millisecond, 10 * time.Millisecond}
 		if want != runDelays {
 			t.Fatalf("got wrong delays: %v, want %v", runDelays, want)
