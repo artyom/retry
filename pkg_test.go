@@ -112,3 +112,28 @@ func TestFunc(t *testing.T) {
 		}
 	})
 }
+
+func ExampleConfig_WithDelayFunc() {
+	cfg := retry.Config{
+		MaxAttempts: 3,
+		RetryOn:     func(err error) bool { return err != nil },
+	}
+	fn := func() error { return errors.New("always failing") }
+
+	delayFunc := func(i int) time.Duration {
+		fmt.Println("delayFunc called with argument", i)
+		return time.Millisecond * time.Duration(i) // increase delay with each attempt made
+	}
+	// retry.Func call below calls fn() over 3 attempts, calling delayFunc twice:
+	//	- fn() call
+	//	- delayFunc(1) call
+	//	- fn() call
+	//	- delayFunc(2) call
+	//	- fn() call
+	err := retry.Func(context.Background(), cfg.WithDelayFunc(delayFunc), fn)
+	fmt.Println("error:", err)
+	// Output:
+	// delayFunc called with argument 1
+	// delayFunc called with argument 2
+	// error: always failing
+}
