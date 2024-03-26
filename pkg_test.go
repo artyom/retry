@@ -111,6 +111,31 @@ func TestFunc(t *testing.T) {
 			t.Fatalf("got unexpected error %v, want %v", err, context.Canceled)
 		}
 	})
+	t.Run("cancel+delay", func(t *testing.T) {
+		fn := func() error { return errors.New("boom") }
+		cfg := retry.Config{
+			MaxAttempts: 10,
+			RetryOn:     func(err error) bool { return err != nil },
+			Delay:       time.Hour,
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := retry.Func(ctx, cfg, fn)
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("got unexpected error %v, want %v", err, context.Canceled)
+		}
+	})
+	t.Run("emptyConfig", func(t *testing.T) {
+		var numCalls int
+		fn := func() error { numCalls++; return errors.New("boom") }
+		err := retry.Func(context.Background(), retry.Config{}, fn)
+		if err == nil {
+			t.Fatal("expecting a non-nil error, got nil")
+		}
+		if numCalls != 1 {
+			t.Fatalf("expecting exactly 1 function call, got %d", numCalls)
+		}
+	})
 }
 
 func ExampleConfig_WithDelayFunc() {
