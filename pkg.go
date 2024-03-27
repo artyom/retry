@@ -8,31 +8,37 @@ import (
 
 // Config configures the behavior of functions in this package.
 type Config struct {
-	MaxAttempts int              // if not positive, defaults to single attempt
-	RetryOn     func(error) bool // how to check if the error is retryable
-	Delay       time.Duration    // optional delay to wait between attempts
+	// MaxAttempts specifies the maximum number of retry attempts.
+	// If not positive, it defaults to a single attempt (no retries).
+	MaxAttempts int
+	// RetryOn is a function that determines whether an error is retryable.
+	// It should return true if the error is retryable, false otherwise.
+	RetryOn func(error) bool
+	// Delay specifies a fixed delay between retry attempts.
+	// Use WithDelayFunc to implement more complex retry strategies.
+	Delay time.Duration
 
 	delayFn func(int) time.Duration
 }
 
-// WithDelayFunc returns a copy of [Config] configured to use a provided function
-// to control delays between retry attempts, which overrides Config.Delay.
+// WithDelayFunc returns a copy of the [Config] with a custom delay function.
 //
-// This provided function is called between retry attempts with the number of attempt
-// as its single argument, and should return a value of a delay made between attempts.
-// This function is only called with positive argument values. Use it to implement
-// non-linear backoff strategies.
+// The provided function is called with the retry attempt number (starting at 1)
+// and should return the delay duration for that attempt.
+//
+// This allows implementing custom backoff strategies.
 func (c *Config) WithDelayFunc(fn func(int) time.Duration) Config {
 	cfg := *c
 	cfg.delayFn = fn
 	return cfg
 }
 
-// Func calls fn at least once and on error retries it according to config values.
-// The context is used to stop retry attempts early, the function is called
-// at least once even if the context is canceled. Context cancelation is mostly
-// useful with a non-zero delay. If the context is canceled, function returns
-// an error returned by the Context.Err method.
+// Func retries the provided function according to the [Config].
+// It returns the error from the last attempt, or nil on success.
+// The provided context can be used to cancel retries early.
+//
+// If the context is canceled, function returns an error returned
+// by the Context.Err method.
 func Func(ctx context.Context, cfg Config, fn func() error) error {
 	if cfg.RetryOn == nil || cfg.MaxAttempts < 1 {
 		return fn()
@@ -72,11 +78,12 @@ retryLoop:
 	return err
 }
 
-// FuncVal calls fn at least once and on error retries it according to config values.
-// The context is used to stop retry attempts early, the function is called
-// at least once even if the context is canceled. Context cancelation is mostly
-// useful with a non-zero delay. If the context is canceled, function returns
-// an error returned by the Context.Err method.
+// FuncVal retries the provided function according to the [Config].
+// It returns the function result and error from the last attempt.
+// The provided context can be used to cancel retries early.
+//
+// If the context is canceled, function returns an error returned
+// by the Context.Err method.
 func FuncVal[T any](ctx context.Context, cfg Config, fn func() (T, error)) (T, error) {
 	var val T
 	wrap := func() error {
